@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy-First Incident Response Guide | Collin College Research Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #F8FAFC;
+      color: #0F172A;
+    }
+
+    /* Smooth transitions for step views and cards */
+    .fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #F1F5F9; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+    /* Print styling for clean Incident Summary PDF export */
+    @media print {
+      body { background: #FFFFFF !important; color: #000000 !important; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      .print-container {
+        box-shadow: none !important;
+        border: 1px solid #CBD5E1 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 16px !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-teal-100 selection:text-teal-900">
+
+  <!-- Top Privacy Trust Banner & Quick Reset -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print shadow-sm">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <!-- Privacy Assurance Badge -->
+      <div class="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-emerald-300 bg-slate-800/90 border border-emerald-500/30 px-3.5 py-1.5 rounded-full">
+        <span class="relative flex h-2.5 w-2.5 shrink-0">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+        </span>
+        <span>Zero Data Stored &bull; 100% Client-Side &bull; No PII, Passwords, or Financial Details Collected</span>
+      </div>
+
+      <!-- Quick Reset / Wipe Session Button -->
+      <button
+        id="quickResetBtn"
+        type="button"
+        onclick="resetSession(true)"
+        class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-rose-900/60 border border-slate-700 hover:border-rose-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer"
+        title="Immediately clear all selections from memory">
+        <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Quick Reset / Clear Session
+      </button>
+    </div>
+  </header>
+
+  <!-- Optional Researcher Study Telemetry Bar (Hidden by Default) -->
+  <div id="researcherBar" class="hidden bg-indigo-950 text-indigo-100 border-b border-indigo-800 no-print">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2 font-semibold text-indigo-300">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        <span>Collin College A/B Study Telemetry</span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="bg-indigo-900/70 px-2.5 py-1 rounded border border-indigo-700/60">
+          <span class="text-indigo-300">Time-to-Decision:</span>
+          <span id="telemetryTimer" class="font-mono font-bold text-white ml-1">00:00</span>
+        </div>
+        <div class="bg-indigo-900/70 px-2.5 py-1 rounded border border-indigo-700/60">
+          <span class="text-indigo-300">Steps Completed:</span>
+          <span id="telemetrySteps" class="font-mono font-bold text-white ml-1">1 / 3</span>
+        </div>
+        <div class="bg-indigo-900/70 px-2.5 py-1 rounded border border-indigo-700/60">
+          <span class="text-indigo-300">Action Coverage:</span>
+          <span id="telemetryCoverage" class="font-mono font-bold text-emerald-300 ml-1">0% (0/0)</span>
+        </div>
+      </div>
+
+      <!-- Study Condition Switcher (Interactive Guide vs. Traditional Static Article) -->
+      <div class="flex items-center gap-1 bg-indigo-900 p-1 rounded-lg border border-indigo-700">
+        <button
+          id="modeInteractiveBtn"
+          type="button"
+          onclick="setStudyCondition('interactive')"
+          class="px-2.5 py-1 rounded-md font-medium transition-colors bg-indigo-600 text-white cursor-pointer">
+          Interactive Guide
+        </button>
+        <button
+          id="modeStaticBtn"
+          type="button"
+          onclick="setStudyCondition('static')"
+          class="px-2.5 py-1 rounded-md font-medium transition-colors text-indigo-300 hover:text-white cursor-pointer">
+          Control: Static Article
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Banner (Replaces alert() cleanly) -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 hidden transform transition-all duration-300 no-print">
+    <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center gap-3 text-sm">
+      <svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+      <span id="toastMessage">Action completed.</span>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-grow max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10">
+
+    <!-- Calm Reassuring Header -->
+    <div class="mb-8 no-print">
+      <div class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200/80 px-3 py-1 rounded-full mb-3">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        Post-Incident Recovery Assistant
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+        Take a breath. Let’s walk through your next steps together.
+      </h1>
+      <p class="mt-2 text-slate-600 text-sm sm:text-base leading-relaxed max-w-2xl">
+        If you suspect you interacted with a scam, you do not need to share personal details, passwords, or messages here. Answer a few simple questions to get a calm, prioritized recovery checklist.
+      </p>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- INTERACTIVE GUIDED WIZARD VIEW (Default Treatment Condition)          -->
+    <!-- ===================================================================== -->
+    <div id="interactiveWizardView">
+
+      <!-- Step Progress Indicator -->
+      <div class="mb-8 no-print" aria-label="Progress">
+        <div class="flex items-center justify-between text-xs sm:text-sm font-medium text-slate-500 mb-2.5">
+          <span id="stepLabelText" class="text-slate-900 font-semibold">Step 1 of 3: Interaction Triage</span>
+          <span id="stepPercentText">33%</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+          <div id="wizardProgressBar" class="bg-teal-600 h-2 rounded-full transition-all duration-300" style="width: 33.33%"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-3 text-xs">
+          <button type="button" onclick="goToStep(1)" id="navStep1" class="text-left font-semibold text-teal-700 flex items-center gap-1.5 cursor-pointer">
+            <span class="w-5 h-5 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-[11px]">1</span>
+            <span>What Happened</span>
+          </button>
+          <button type="button" onclick="goToStep(2)" id="navStep2" class="text-left font-medium text-slate-400 flex items-center gap-1.5 cursor-pointer">
+            <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 inline-flex items-center justify-center text-[11px]">2</span>
+            <span>Timing &amp; Device</span>
+          </button>
+          <button type="button" onclick="goToStep(3)" id="navStep3" class="text-left font-medium text-slate-400 flex items-center gap-1.5 cursor-pointer">
+            <span class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 inline-flex items-center justify-center text-[11px]">3</span>
+            <span>Action Plan &amp; Report</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 1: Non-Sensitive Interaction Triage -->
+      <section id="step1Section" class="fade-in bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-slate-900">What actions have already occurred?</h2>
+          <p class="text-sm text-slate-600 mt-1">
+            Select <span class="font-semibold text-slate-800">all that apply</span>. Please do not enter any actual passwords, account numbers, or personal names.
+          </p>
+        </div>
+
+        <!-- Multi-select Interaction Cards -->
+        <div id="interactionCardsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <!-- Cards populated dynamically by JS for clean state binding -->
+        </div>
+
+        <!-- Privacy Reminder Box -->
+        <div class="mt-6 bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex items-start gap-3 text-xs text-slate-600">
+          <svg class="w-4 h-4 text-teal-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          <span>
+            <strong>Privacy Guarantee:</strong> Your selections stay strictly in your browser’s temporary memory and are never transmitted to any server.
+          </span>
+        </div>
+
+        <!-- Step 1 Navigation -->
+        <div class="mt-8 flex items-center justify-between pt-5 border-t border-slate-100">
+          <span id="step1ValidationMsg" class="text-xs font-medium text-amber-700 hidden">
+            Please select at least one option above to continue.
+          </span>
+          <button
+            type="button"
+            onclick="handleStep1Next()"
+            class="ml-auto inline-flex items-center gap-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold text-sm px-6 py-3 rounded-xl shadow-sm transition-all cursor-pointer">
+            <span>Continue to Timing &amp; Context</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 2: Quick Context & Timing -->
+      <section id="step2Section" class="hidden fade-in bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-slate-900">Quick Context &amp; Timing</h2>
+          <p class="text-sm text-slate-600 mt-1">
+            Two brief questions help us prioritize urgent containment versus follow-up protection.
+          </p>
+        </div>
+
+        <!-- Question 2A: Timing -->
+        <div class="mb-7">
+          <label class="block text-sm font-semibold text-slate-800 mb-3">
+            1. Roughly when did this interaction happen?
+          </label>
+          <div id="timingOptionsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Question 2B: Device Ownership -->
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-slate-800 mb-3">
+            2. Was this on a personal device or a work/school-managed device?
+          </label>
+          <div id="deviceOptionsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Step 2 Navigation -->
+        <div class="mt-8 flex flex-wrap items-center justify-between gap-3 pt-5 border-t border-slate-100">
+          <button
+            type="button"
+            onclick="goToStep(1)"
+            class="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 font-medium text-sm px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Back
+          </button>
+
+          <button
+            type="button"
+            onclick="handleStep2Next()"
+            class="inline-flex items-center gap-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold text-sm px-6 py-3 rounded-xl shadow-sm transition-all cursor-pointer">
+            <span>Generate My Recovery Plan</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 3: Prioritized Action Plan & Privacy-Safe Incident Summary -->
+      <section id="step3Section" class="hidden fade-in space-y-6">
+
+        <!-- Recovery Progress Card -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-7 no-print">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <span id="urgencyPill" class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 mb-2">
+                Tailored Recovery Checklist
+              </span>
+              <h2 class="text-xl font-bold text-slate-900">Your Prioritized Action Plan</h2>
+              <p class="text-sm text-slate-600 mt-0.5">
+                Work through these steps from top to bottom. Check off items as you complete them.
+              </p>
+            </div>
+            <button
+              type="button"
+              onclick="goToStep(1)"
+              class="self-start sm:self-center text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 px-3 py-2 rounded-lg transition-colors cursor-pointer">
+              Edit Selections
+            </button>
+          </div>
+
+          <!-- Live Checklist Completion Progress Bar -->
+          <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
+            <div class="flex items-center justify-between text-xs sm:text-sm font-semibold mb-2">
+              <span class="text-slate-700">Recovery Progress</span>
+              <span id="checklistProgressLabel" class="text-teal-700">0 of 0 steps completed (0%)</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+              <div id="checklistProgressBar" class="bg-emerald-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tiered Checklists Container -->
+        <div id="tieredChecklistContainer" class="space-y-5 no-print">
+          <!-- Populated dynamically with Tier 1, Tier 2, and Tier 3 cards -->
+        </div>
+
+        <!-- Privacy-Safe Structured Incident Summary Generator -->
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8 print-container">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
+            <div>
+              <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md mb-2">
+                <svg class="w-3.5 h-3.5 text-teal-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Redaction-Safe Handoff Document
+              </div>
+              <h3 class="text-lg sm:text-xl font-bold text-slate-900">Structured Incident Summary</h3>
+              <p class="text-xs sm:text-sm text-slate-600 mt-1">
+                Share this summary with your bank, employer IT helpdesk, or law enforcement without exposing sensitive data prematurely. Fill in bracketed fields offline after printing or copying.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 shrink-0 no-print">
+              <button
+                type="button"
+                onclick="copyIncidentSummary()"
+                class="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-sm transition-colors cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                </svg>
+                Copy Summary
+              </button>
+              <button
+                type="button"
+                onclick="window.print()"
+                class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 font-medium text-xs sm:text-sm px-4 py-2.5 rounded-xl border border-slate-300 shadow-sm transition-colors cursor-pointer">
+                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                </svg>
+                Print / Save as PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Formatted Plain-Text Preview Box -->
+          <div class="mt-5">
+            <pre id="incidentSummaryOutput" class="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 text-xs sm:text-sm font-mono text-slate-800 whitespace-pre-wrap leading-relaxed overflow-x-auto"></pre>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- CONTROL CONDITION: TRADITIONAL STATIC INFORMATIONAL ARTICLE VIEW       -->
+    <!-- (Only accessible when Researcher Study Mode is toggled on)            -->
+    <!-- ===================================================================== -->
+    <div id="staticArticleView" class="hidden fade-in bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+      <div class="border-b border-slate-200 pb-4">
+        <span class="inline-block text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-1 rounded mb-2">
+          Study Control Condition: Traditional Informational Web Page
+        </span>
+        <h2 class="text-2xl font-bold text-slate-900">What To Do If You Suspect You Have Been Scammed</h2>
+        <p class="text-sm text-slate-500 mt-1">General Consumer Cybersecurity Guidance Article</p>
+      </div>
+
+      <div class="prose prose-slate max-w-none text-sm text-slate-700 space-y-4 leading-relaxed">
+        <p>
+          Online fraud and social engineering attacks take many forms, including phishing emails, smishing text messages, tech support scams, and fraudulent payment requests. If you believe you may have interacted with a scammer, it is important to take steps to protect your accounts, devices, and financial well-being. Because scams vary widely depending on the type of information exposed, you should carefully read through all sections below to identify which advice applies to your situation.
+        </p>
+
+        <h3 class="text-base font-bold text-slate-900 pt-2">1. Financial Accounts and Payment Transfers</h3>
+        <p>
+          If you paid a scammer with a credit or debit card, contact your card issuer immediately using the phone number printed on the back of your physical card and ask them to reverse the charge or freeze the account. If you sent money via wire transfer, peer-to-peer payment apps (such as Zelle, Venmo, or Cash App), cryptocurrency, or gift cards, contact the payment provider or gift card company right away to report fraud, though recovery options vary by payment method. If you shared your Social Security Number or tax identification details, consider placing a security freeze with all three major credit bureaus (Equifax, Experian, and TransUnion) and placing a fraud alert on your credit file.
+        </p>
+
+        <h3 class="text-base font-bold text-slate-900 pt-2">2. Compromised Passwords and Login Credentials</h3>
+        <p>
+          If you entered your username, password, or multi-factor authentication code on a suspicious website, change your password immediately using a separate, trusted device. Ensure that your new password is strong and unique. If you reused that same password on other websites—especially email or banking accounts—update those passwords as well. Enable app-based multi-factor authentication (MFA) wherever available and review your account settings to sign out of all active sessions or unrecognized devices.
+        </p>
+
+        <h3 class="text-base font-bold text-slate-900 pt-2">3. Malicious Downloads and Remote Access Software</h3>
+        <p>
+          If you downloaded an unknown attachment, installed software from an unverified source, or allowed someone to remotely access your computer or phone, disconnect the device from the internet immediately (turn off Wi-Fi or unplug the Ethernet cable) to prevent further unauthorized access. Uninstall any remote access utilities you were instructed to install, update your security software, and run a full antivirus and anti-malware scan. If the device belongs to your employer or school, notify your organization's IT or Information Security department immediately so they can isolate and inspect the system.
+        </p>
+
+        <h3 class="text-base font-bold text-slate-900 pt-2">4. Suspicious Links and Unsolicited Replies</h3>
+        <p>
+          If you only clicked a link without entering credentials or downloading files, close the browser tab, clear your browser cache and cookies, and ensure your browser and operating system are up to date. If you replied to a scam message or shared your phone number or email address, be alert for follow-up phishing attempts or impersonation calls, and avoid engaging further with the sender.
+        </p>
+
+        <h3 class="text-base font-bold text-slate-900 pt-2">5. Documenting Evidence and Reporting Fraud</h3>
+        <p>
+          Preserve evidence of the interaction by taking screenshots of messages, email headers, phone numbers, or transaction receipts without clicking any links inside the suspicious message. Report the scam to the Federal Trade Commission at ReportFraud.ftc.gov, the FBI Internet Crime Complaint Center at ic3.gov, and your local law enforcement agency if financial loss or identity theft occurred.
+        </p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Academic Attribution & Discreet Researcher Study Mode Footer -->
+  <footer class="border-t border-slate-200 bg-white mt-auto no-print">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <div class="text-center sm:text-left">
+        <p class="font-medium text-slate-700">
+          Privacy-First Incident Response Guidance for Suspected Scam Victims
+        </p>
+        <p class="mt-0.5">
+          Research Concept by Michael Davis &amp; Bilal Abu Bakr &bull; Collin College, McKinney, TX
+        </p>
+      </div>
+
+      <!-- Discreet Toggle for Researcher Study Mode -->
+      <div class="flex items-center gap-2">
+        <button
+          id="toggleResearcherBtn"
+          type="button"
+          onclick="toggleResearcherMode()"
+          class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <span id="researcherToggleLabel">Researcher Study Mode: Off</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /**
+     * =========================================================================
+     * PRIVACY-FIRST INCIDENT RESPONSE ENGINE (100% EPHEMERAL IN-MEMORY STATE)
+     * No localStorage, no sessionStorage, no cookies, no network telemetry.
+     * =========================================================================
+     */
+
+    // Ephemeral session state (cleared immediately on Reset or page refresh)
+    const appState = {
+      currentStep: 1,
+      selectedInteractions: new Set(),
+      timing: 'within_hour', // 'within_hour' | 'today' | 'over_24h'
+      deviceType: 'personal', // 'personal' | 'work_school' | 'unsure'
+      completedActions: new Set(),
+      researcherMode: false,
+      studyCondition: 'interactive', // 'interactive' | 'static'
+      sessionStartTime: Date.now(),
+      decisionReachedTime: null
+    };
+
+    // Step 1: Non-sensitive interaction triage definitions
+    const INTERACTION_OPTIONS = [
+      {
+        id: 'clicked_link',
+        title: 'Clicked a suspicious link or visited an unknown website',
+        description: 'Opened a URL from an email, text message, QR code, or pop-up.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>`
+      },
+      {
+        id: 'entered_credentials',
+        title: 'Entered a username, password, or 2FA/MFA code',
+        description: 'Typed login details or a verification code into a prompt or webpage.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>`
+      },
+      {
+        id: 'disclosed_financial',
+        title: 'Disclosed financial or identity info',
+        description: 'Shared card numbers, bank routing details, SSN, or tax ID.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>`
+      },
+      {
+        id: 'transferred_money',
+        title: 'Sent or transferred money',
+        description: 'Paid via Zelle, wire transfer, crypto, gift card, ACH, or debit/credit card.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>`
+      },
+      {
+        id: 'downloaded_remote',
+        title: 'Downloaded a file or granted remote access',
+        description: 'Opened an attachment, installed an app, or let someone control your screen.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>`
+      },
+      {
+        id: 'replied_contact',
+        title: 'Replied to the sender or shared contact details',
+        description: 'Responded via text/email/phone or confirmed your phone number or email.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>`
+      },
+      {
+        id: 'none_unsure',
+        title: 'None of the above / Unsure (only viewed the message)',
+        description: 'Opened or read the message, or unsure if any interaction occurred.',
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>`,
+        fullWidth: true
+      }
+    ];
+
+    // Step 2: Timing & Device options
+    const TIMING_OPTIONS = [
+      { id: 'within_hour', label: 'Within the last hour', sub: 'Highest window for payment recall' },
+      { id: 'today', label: 'Earlier today', sub: 'Same-day containment priority' },
+      { id: 'over_24h', label: 'More than 24 hours ago', sub: 'Focus on monitoring & recovery' }
+    ];
+
+    const DEVICE_OPTIONS = [
+      { id: 'personal', label: 'Personal device', sub: 'Phone, tablet, or home computer' },
+      { id: 'work_school', label: 'Work or school device', sub: 'Managed by an IT/Security team' },
+      { id: 'unsure', label: 'Unsure / Shared device', sub: 'Includes precaution steps' }
+    ];
+
+    /**
+     * Render Step 1 Interaction Triage Cards
+     */
+    function renderInteractionCards() {
+      const grid = document.getElementById('interactionCardsGrid');
+      grid.innerHTML = INTERACTION_OPTIONS.map(opt => {
+        const isSelected = appState.selectedInteractions.has(opt.id);
+        const colSpanClass = opt.fullWidth ? 'md:col-span-2' : '';
+        return `
+          <button
+            type="button"
+            onclick="toggleInteraction('${opt.id}')"
+            aria-pressed="${isSelected}"
+            class="${colSpanClass} text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3.5 cursor-pointer ${
+              isSelected
+                ? 'border-teal-600 bg-teal-50/70 shadow-xs'
+                : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/70'
+            }">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+              isSelected ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600'
+            }">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                ${opt.icon}
+              </svg>
+            </div>
+            <div class="flex-grow">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold text-sm text-slate-900">${opt.title}</span>
+                <span class="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                  isSelected
+                    ? 'bg-teal-600 border-teal-600 text-white'
+                    : 'border-slate-300 bg-white'
+                }">
+                  ${isSelected ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>` : ''}
+                </span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1 leading-relaxed">${opt.description}</p>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    /**
+     * Toggle multi-select interaction card with mutual exclusion for 'none_unsure'
+     */
+    function toggleInteraction(id) {
+      document.getElementById('step1ValidationMsg').classList.add('hidden');
+      if (id === 'none_unsure') {
+        if (appState.selectedInteractions.has('none_unsure')) {
+          appState.selectedInteractions.delete('none_unsure');
+        } else {
+          appState.selectedInteractions.clear();
+          appState.selectedInteractions.add('none_unsure');
+        }
+      } else {
+        appState.selectedInteractions.delete('none_unsure');
+        if (appState.selectedInteractions.has(id)) {
+          appState.selectedInteractions.delete(id);
+        } else {
+          appState.selectedInteractions.add(id);
+        }
+      }
+      renderInteractionCards();
+    }
+
+    /**
+     * Render Step 2 Timing and Device Context Cards
+     */
+    function renderContextOptions() {
+      const timingGrid = document.getElementById('timingOptionsGrid');
+      timingGrid.innerHTML = TIMING_OPTIONS.map(opt => {
+        const active = appState.timing === opt.id;
+        return `
+          <button
+            type="button"
+            onclick="selectTiming('${opt.id}')"
+            class="text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+              active
+                ? 'border-teal-600 bg-teal-50/70'
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-slate-900">${opt.label}</span>
+              <span class="w-4 h-4 rounded-full border flex items-center justify-center ${
+                active ? 'border-teal-600' : 'border-slate-300'
+              }">
+                ${active ? '<span class="w-2 h-2 rounded-full bg-teal-600"></span>' : ''}
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">${opt.sub}</p>
+          </button>
+        `;
+      }).join('');
+
+      const deviceGrid = document.getElementById('deviceOptionsGrid');
+      deviceGrid.innerHTML = DEVICE_OPTIONS.map(opt => {
+        const active = appState.deviceType === opt.id;
+        return `
+          <button
+            type="button"
+            onclick="selectDevice('${opt.id}')"
+            class="text-left p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+              active
+                ? 'border-teal-600 bg-teal-50/70'
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-slate-900">${opt.label}</span>
+              <span class="w-4 h-4 rounded-full border flex items-center justify-center ${
+                active ? 'border-teal-600' : 'border-slate-300'
+              }">
+                ${active ? '<span class="w-2 h-2 rounded-full bg-teal-600"></span>' : ''}
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">${opt.sub}</p>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectTiming(id) {
+      appState.timing = id;
+      renderContextOptions();
+    }
+
+    function selectDevice(id) {
+      appState.deviceType = id;
+      renderContextOptions();
+    }
+
+    /**
+     * Navigation Handlers
+     */
+    function handleStep1Next() {
+      if (appState.selectedInteractions.size === 0) {
+        document.getElementById('step1ValidationMsg').classList.remove('hidden');
+        return;
+      }
+      goToStep(2);
+    }
+
+    function handleStep2Next() {
+      if (!appState.decisionReachedTime) {
+        appState.decisionReachedTime = Date.now();
+      }
+      goToStep(3);
+    }
+
+    function goToStep(stepNumber) {
+      if (stepNumber > 1 && appState.selectedInteractions.size === 0) {
+        document.getElementById('step1ValidationMsg').classList.remove('hidden');
+        return;
+      }
+      appState.currentStep = stepNumber;
+
+      // Toggle section visibility
+      document.getElementById('step1Section').classList.toggle('hidden', stepNumber !== 1);
+      document.getElementById('step2Section').classList.toggle('hidden', stepNumber !== 2);
+      document.getElementById('step3Section').classList.toggle('hidden', stepNumber !== 3);
+
+      // Update top progress indicator
+      const stepLabels = {
+        1: 'Step 1 of 3: Interaction Triage',
+        2: 'Step 2 of 3: Timing & Device Context',
+        3: 'Step 3 of 3: Prioritized Action Plan & Summary'
+      };
+      const stepPercents = { 1: '33%', 2: '67%', 3: '100%' };
+      document.getElementById('stepLabelText').textContent = stepLabels[stepNumber];
+      document.getElementById('stepPercentText').textContent = stepPercents[stepNumber];
+      document.getElementById('wizardProgressBar').style.width = stepPercents[stepNumber];
+
+      // Update mini step pills
+      [1, 2, 3].forEach(n => {
+        const btn = document.getElementById(`navStep${n}`);
+        const badge = btn.querySelector('span:first-child');
+        if (n === stepNumber) {
+          btn.className = 'text-left font-semibold text-teal-700 flex items-center gap-1.5 cursor-pointer';
+          badge.className = 'w-5 h-5 rounded-full bg-teal-600 text-white inline-flex items-center justify-center text-[11px]';
+        } else if (n < stepNumber) {
+          btn.className = 'text-left font-medium text-emerald-700 flex items-center gap-1.5 cursor-pointer';
+          badge.className = 'w-5 h-5 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[11px]';
+        } else {
+          btn.className = 'text-left font-medium text-slate-400 flex items-center gap-1.5 cursor-pointer';
+          badge.className = 'w-5 h-5 rounded-full bg-slate-200 text-slate-600 inline-flex items-center justify-center text-[11px]';
+        }
+      });
+
+      if (stepNumber === 3) {
+        buildActionPlanAndSummary();
+      }
+
+      updateResearcherTelemetry();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /**
+     * Rule-Based Tailored Action Plan Engine
+     * Maps non-sensitive interaction vectors + context into prioritized recovery tiers
+     */
+    function generateTailoredActions() {
+      const sel = appState.selectedInteractions;
+      const isWork = appState.deviceType === 'work_school' || appState.deviceType === 'unsure';
+      const isImmediate = appState.timing === 'within_hour' || appState.timing === 'today';
+
+      const tier1 = []; // Immediate Damage Control (Do First)
+      const tier2 = []; // Account & Identity Hardening (Next 24 Hours)
+      const tier3 = []; // Evidence Preservation & Reporting
+
+      // --- TIER 1: IMMEDIATE DAMAGE CONTROL ---
+      if (sel.has('downloaded_remote')) {
+        tier1.push({
+          id: 't1_isolate_device',
+          title: 'Disconnect the affected device from the internet immediately',
+          detail: 'Turn off Wi-Fi, enable Airplane Mode, or unplug the Ethernet cable to block ongoing remote access or malware communication.'
+        });
+        tier1.push({
+          id: 't1_revoke_remote_tool',
+          title: 'Uninstall any newly downloaded remote-support apps or unknown files',
+          detail: 'Remove tools like AnyDesk, TeamViewer, QuickAssist, or suspicious installers, then run a full offline antivirus/malware scan.'
+        });
+      }
+
+      if (sel.has('transferred_money')) {
+        tier1.push({
+          id: 't1_contact_fraud_dept',
+          title: 'Call your bank or payment provider’s Fraud Department immediately',
+          detail: isImmediate
+            ? 'Because this happened recently, ask right away for a wire recall, ACH stop, or unauthorized transaction dispute using the official number on the back of your card.'
+            : 'Use the official phone number on the back of your card or official app to report the fraudulent transfer and request a dispute/recall.'
+        });
+        tier1.push({
+          id: 't1_giftcard_crypto',
+          title: 'If paid via gift card or crypto, report to the issuer immediately',
+          detail: 'Contact the gift card company’s fraud line with the receipt or report the wallet address to your cryptocurrency exchange.'
+        });
+      }
+
+      if (sel.has('disclosed_financial')) {
+        tier1.push({
+          id: 't1_freeze_cards',
+          title: 'Lock or cancel any exposed debit/credit cards',
+          detail: 'Use your bank’s official mobile app or call the number on the back of your card to freeze the compromised card and request a replacement.'
+        });
+      }
+
+      if (sel.has('entered_credentials')) {
+        tier1.push({
+          id: 't1_reset_password',
+          title: 'Change the compromised password from a clean, separate device',
+          detail: 'Do not use the potentially compromised browser/device if malware is suspected. Create a strong, unique password never used elsewhere.'
+        });
+        tier1.push({
+          id: 't1_revoke_sessions',
+          title: 'Sign out of all active sessions and review MFA devices',
+          detail: 'In your account security settings, select "Sign out of all devices" and remove any unfamiliar phone numbers or authenticator apps.'
+        });
+      }
+
+      if (isWork && !sel.has('none_unsure')) {
+        tier1.push({
+          id: 't1_notify_org_it',
+          title: 'Notify your organization’s IT / Information Security Helpdesk right away',
+          detail: 'Because a work or school device may be involved, your IT team can revoke corporate tokens and isolate the device safely.'
+        });
+      }
+
+      if (sel.has('clicked_link') && tier1.length === 0) {
+        tier1.push({
+          id: 't1_close_clear_browser',
+          title: 'Close the suspicious browser tab and clear browser cache/cookies',
+          detail: 'Do not enter any information on the page. Close the tab completely and clear recent site data.'
+        });
+      }
+
+      if (sel.has('none_unsure') && tier1.length === 0) {
+        tier1.push({
+          id: 't1_delete_no_reply',
+          title: 'Do not reply, click links, or call phone numbers inside the message',
+          detail: 'Simply viewing an email or text message rarely compromises a modern device. Mark the message as spam/phishing and delete it.'
+        });
+      }
+
+      // --- TIER 2: ACCOUNT & IDENTITY HARDENING (NEXT 24 HOURS) ---
+      if (sel.has('entered_credentials')) {
+        tier2.push({
+          id: 't2_update_reused_passwords',
+          title: 'Update any other accounts that shared the same password',
+          detail: 'Prioritize your primary email account, banking logins, and cloud storage.'
+        });
+        tier2.push({
+          id: 't2_enable_app_mfa',
+          title: 'Enable app-based Multi-Factor Authentication (MFA)',
+          detail: 'Use an authenticator app or hardware security key rather than SMS text codes where supported.'
+        });
+      }
+
+      if (sel.has('disclosed_financial') || sel.has('transferred_money')) {
+        tier2.push({
+          id: 't2_credit_freeze',
+          title: 'Place a free Security Freeze with all 3 major credit bureaus',
+          detail: 'Freeze your credit files online at Equifax, Experian, and TransUnion to prevent criminals from opening new credit lines.'
+        });
+        tier2.push({
+          id: 't2_bank_alerts',
+          title: 'Enable real-time transaction and login alerts on financial accounts',
+          detail: 'Set alerts for any withdrawal, transfer, or profile change over $1.'
+        });
+      }
+
+      if (sel.has('clicked_link') || sel.has('downloaded_remote')) {
+        tier2.push({
+          id: 't2_os_browser_updates',
+          title: 'Install pending operating system and web browser updates',
+          detail: 'Security patches close vulnerabilities that malicious websites attempt to exploit.'
+        });
+      }
+
+      if (sel.has('replied_contact') || sel.has('none_unsure') || tier2.length === 0) {
+        tier2.push({
+          id: 't2_heightened_vigilance',
+          title: 'Watch for follow-up impersonation calls or texts over the next 7 days',
+          detail: 'Scammers often follow up posing as "bank fraud investigators" or "tech support" referencing your earlier interaction.'
+        });
+      }
+
+      // --- TIER 3: EVIDENCE PRESERVATION & REPORTING ---
+      tier3.push({
+        id: 't3_preserve_evidence',
+        title: 'Take screenshots of the message, sender address/number, and any receipts',
+        detail: 'Capture details safely without clicking links. Keep a brief timeline of what happened for your bank or law enforcement.'
+      });
+
+      if (!sel.has('none_unsure')) {
+        tier3.push({
+          id: 't3_report_ftc_ic3',
+          title: 'Submit an official fraud report to the FTC and FBI IC3',
+          detail: 'File a report at ReportFraud.ftc.gov (Federal Trade Commission) and ic3.gov (FBI Internet Crime Complaint Center).'
+        });
+      } else {
+        tier3.push({
+          id: 't3_report_phishing',
+          title: 'Forward or report the suspicious message as phishing',
+          detail: 'Use your email or messaging app’s built-in "Report Phishing / Junk" button so providers can block the sender.'
+        });
+      }
+
+      return { tier1, tier2, tier3 };
+    }
+
+    /**
+     * Render Tiered Checklists & Update Structured Incident Summary
+     */
+    function buildActionPlanAndSummary() {
+      const { tier1, tier2, tier3 } = generateTailoredActions();
+      const allActions = [...tier1, ...tier2, ...tier3];
+
+      // Clean up any stale checked IDs that no longer apply
+      const validIds = new Set(allActions.map(a => a.id));
+      for (const id of appState.completedActions) {
+        if (!validIds.has(id)) appState.completedActions.delete(id);
+      }
+
+      // Update urgency badge
+      const urgencyPill = document.getElementById('urgencyPill');
+      if (appState.selectedInteractions.has('none_unsure')) {
+        urgencyPill.textContent = 'Low Risk • Precautionary Guidance';
+        urgencyPill.className = 'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 mb-2';
+      } else if (appState.timing === 'within_hour') {
+        urgencyPill.textContent = 'Time-Sensitive • Immediate Containment Recommended';
+        urgencyPill.className = 'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 mb-2';
+      } else {
+        urgencyPill.textContent = 'Tailored Recovery Checklist';
+        urgencyPill.className = 'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 mb-2';
+      }
+
+      const tiersMeta = [
+        {
+          key: 'tier1',
+          badge: 'Tier 1 • Do First',
+          title: 'Immediate Damage Control',
+          subtitle: 'Highest-impact actions to stop financial loss or unauthorized access right now.',
+          accentBorder: 'border-l-4 border-l-rose-500',
+          badgeStyle: 'bg-rose-50 text-rose-800 border-rose-200',
+          items: tier1
+        },
+        {
+          key: 'tier2',
+          badge: 'Tier 2 • Next 24 Hours',
+          title: 'Account & Identity Hardening',
+          subtitle: 'Prevent secondary account takeovers and unauthorized credit activity.',
+          accentBorder: 'border-l-4 border-l-amber-500',
+          badgeStyle: 'bg-amber-50 text-amber-800 border-amber-200',
+          items: tier2
+        },
+        {
+          key: 'tier3',
+          badge: 'Tier 3 • Documentation',
+          title: 'Evidence Preservation & Reporting',
+          subtitle: 'Create an official paper trail for banks, IT teams, and consumer protection agencies.',
+          accentBorder: 'border-l-4 border-l-teal-600',
+          badgeStyle: 'bg-teal-50 text-teal-800 border-teal-200',
+          items: tier3
+        }
+      ];
+
+      const container = document.getElementById('tieredChecklistContainer');
+      container.innerHTML = tiersMeta.map(tier => `
+        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 ${tier.accentBorder}">
+          <div class="mb-4">
+            <span class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border ${tier.badgeStyle} mb-1.5">
+              ${tier.badge}
+            </span>
+            <h3 class="text-lg font-bold text-slate-900">${tier.title}</h3>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5">${tier.subtitle}</p>
+          </div>
+          <div class="space-y-3">
+            ${tier.items.map(item => {
+              const checked = appState.completedActions.has(item.id);
+              return `
+                <label
+                  onclick="toggleActionCheckbox('${item.id}')"
+                  class="flex items-start gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
+                    checked
+                      ? 'bg-emerald-50/50 border-emerald-200/90'
+                      : 'bg-slate-50/60 hover:bg-slate-50 border-slate-200/80'
+                  }">
+                  <span class="mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                    checked
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-white border-slate-300'
+                  }">
+                    ${checked ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>` : ''}
+                  </span>
+                  <div class="flex-grow">
+                    <div class="text-sm font-semibold ${checked ? 'line-through text-slate-500' : 'text-slate-900'}">
+                      ${item.title}
+                    </div>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">${item.detail}</p>
+                  </div>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      updateChecklistProgress(allActions);
+      renderIncidentSummaryText(allActions);
+    }
+
+    function toggleActionCheckbox(actionId) {
+      if (appState.completedActions.has(actionId)) {
+        appState.completedActions.delete(actionId);
+      } else {
+        appState.completedActions.add(actionId);
+      }
+      buildActionPlanAndSummary();
+    }
+
+    function updateChecklistProgress(allActions) {
+      const total = allActions.length;
+      const done = allActions.filter(a => appState.completedActions.has(a.id)).length;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+      document.getElementById('checklistProgressLabel').textContent = `${done} of ${total} steps completed (${pct}%)`;
+      document.getElementById('checklistProgressBar').style.width = `${pct}%`;
+
+      // Update Researcher Telemetry Coverage metric
+      document.getElementById('telemetryCoverage').textContent = `${pct}% (${done}/${total})`;
+    }
+
+    /**
+     * Generate Redaction-Safe Structured Incident Summary Report
+     */
+    function renderIncidentSummaryText(allActions) {
+      const now = new Date();
+      const timestamp = now.toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      const selectedLabels = INTERACTION_OPTIONS
+        .filter(o => appState.selectedInteractions.has(o.id))
+        .map(o => `  • ${o.title}`);
+
+      const timingLabel = (TIMING_OPTIONS.find(t => t.id === appState.timing) || {}).label || 'Not specified';
+      const deviceLabel = (DEVICE_OPTIONS.find(d => d.id === appState.deviceType) || {}).label || 'Not specified';
+
+      const completedList = allActions
+        .filter(a => appState.completedActions.has(a.id))
+        .map(a => `  [X] ${a.title}`);
+
+      const pendingList = allActions
+        .filter(a => !appState.completedActions.has(a.id))
+        .map(a => `  [ ] ${a.title}`);
+
+      const summaryText = [
+        `====================================================================`,
+        `PRIVACY-FIRST SUSPECTED SCAM INCIDENT SUMMARY (REDACTION-SAFE)`,
+        `Generated: ${timestamp} (Local Client-Side Session — Zero PII Stored)`,
+        `====================================================================`,
+        ``,
+        `1. RECIPIENT / CASE REFERENCE (Complete Offline Before Sharing)`,
+        `   • Prepared For:      [INSERT BANK / EMPLOYER IT / AGENCY NAME]`,
+        `   • Case / Claim #:    [INSERT CASE OR REFERENCE NUMBER IF PROVIDED]`,
+        `   • Contact Callback:  [INSERT SAFE CALLBACK NUMBER Offline]`,
+        ``,
+        `2. INCIDENT CONTEXT & INTERACTION VECTORS`,
+        `   • Estimated Timing:  ${timingLabel}`,
+        `   • Device Context:    ${deviceLabel}`,
+        `   • Suspected Channel: [INSERT: Email / SMS Text / Phone Call / Website]`,
+        `   • Reported Actions:`,
+        ...selectedLabels,
+        ``,
+        `3. PROTECTIVE ACTIONS ALREADY COMPLETED`,
+        ...(completedList.length > 0 ? completedList : ['  (No checklist actions marked complete yet)']),
+        ``,
+        `4. RECOMMENDED NEXT ACTIONS PENDING`,
+        ...(pendingList.length > 0 ? pendingList : ['  (All recommended checklist items completed)']),
+        ``,
+        `5. PRIVACY & DATA MINIMIZATION NOTE`,
+        `   This summary was generated locally without collecting passwords,`,
+        `   account numbers, SSNs, or raw scam message content.`,
+        `====================================================================`
+      ].join('\n');
+
+      document.getElementById('incidentSummaryOutput').textContent = summaryText;
+    }
+
+    /**
+     * Copy Summary using execCommand fallback for reliable iframe compatibility
+     */
+    function copyIncidentSummary() {
+      const text = document.getElementById('incidentSummaryOutput').textContent;
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Redaction-safe incident summary copied to clipboard.');
+      } catch (err) {
+        showToast('Unable to copy automatically. Please select and copy the text box.');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    /**
+     * Quick Reset / Wipe Session
+     */
+    function resetSession(notify = false) {
+      appState.currentStep = 1;
+      appState.selectedInteractions.clear();
+      appState.timing = 'within_hour';
+      appState.deviceType = 'personal';
+      appState.completedActions.clear();
+      appState.sessionStartTime = Date.now();
+      appState.decisionReachedTime = null;
+
+      renderInteractionCards();
+      renderContextOptions();
+      goToStep(1);
+
+      if (notify) {
+        showToast('Session wiped. All selections cleared from browser memory.');
+      }
+    }
+
+    /**
+     * Subtle Non-Blocking Toast Banner
+     */
+    let toastTimeout = null;
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      document.getElementById('toastMessage').textContent = msg;
+      banner.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 3200);
+    }
+
+    /**
+     * Researcher Evaluation Mode (Collin College A/B Study Controls)
+     */
+    function toggleResearcherMode() {
+      appState.researcherMode = !appState.researcherMode;
+      const bar = document.getElementById('researcherBar');
+      const label = document.getElementById('researcherToggleLabel');
+
+      if (appState.researcherMode) {
+        bar.classList.remove('hidden');
+        label.textContent = 'Researcher Study Mode: On';
+      } else {
+        bar.classList.add('hidden');
+        label.textContent = 'Researcher Study Mode: Off';
+        setStudyCondition('interactive');
+      }
+      updateResearcherTelemetry();
+    }
+
+    function setStudyCondition(condition) {
+      appState.studyCondition = condition;
+      const interactiveView = document.getElementById('interactiveWizardView');
+      const staticView = document.getElementById('staticArticleView');
+      const btnInt = document.getElementById('modeInteractiveBtn');
+      const btnStat = document.getElementById('modeStaticBtn');
+
+      if (condition === 'static') {
+        interactiveView.classList.add('hidden');
+        staticView.classList.remove('hidden');
+        btnStat.className = 'px-2.5 py-1 rounded-md font-medium transition-colors bg-indigo-600 text-white cursor-pointer';
+        btnInt.className = 'px-2.5 py-1 rounded-md font-medium transition-colors text-indigo-300 hover:text-white cursor-pointer';
+      } else {
+        staticView.classList.add('hidden');
+        interactiveView.classList.remove('hidden');
+        btnInt.className = 'px-2.5 py-1 rounded-md font-medium transition-colors bg-indigo-600 text-white cursor-pointer';
+        btnStat.className = 'px-2.5 py-1 rounded-md font-medium transition-colors text-indigo-300 hover:text-white cursor-pointer';
+      }
+    }
+
+    function updateResearcherTelemetry() {
+      const endTime = appState.decisionReachedTime || Date.now();
+      const elapsedSec = Math.max(0, Math.floor((endTime - appState.sessionStartTime) / 1000));
+      const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+
+      document.getElementById('telemetryTimer').textContent = `${mins}:${secs}`;
+      document.getElementById('telemetrySteps').textContent = `${appState.currentStep} / 3`;
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderInteractionCards();
+      renderContextOptions();
+      setInterval(updateResearcherTelemetry, 1000);
+    });
+  </script>
+</body>
+</html>
